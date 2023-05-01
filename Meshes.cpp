@@ -58,7 +58,7 @@ HRESULT InitD3D( HWND hWnd )
     d3dDevice->SetRenderState( D3DRS_ZENABLE, TRUE );
 
     // Turn on ambient lighting 
-    d3dDevice->SetRenderState( D3DRS_AMBIENT,   0xffffffff);
+    d3dDevice->SetRenderState( D3DRS_AMBIENT, 0x002C2C2C);
 
 
     return S_OK;
@@ -136,7 +136,10 @@ HRESULT InitGeometry()
 
         // Set the ambient color for the material (D3DX does not do this)
         MeshMaterials[i].Ambient = MeshMaterials[i].Diffuse;
-
+        
+        //MeshMaterials[i].Emissive.b += 0.6;
+        //MeshMaterials[i].Emissive.g += 0.6;
+        //MeshMaterials[i].Emissive.r += 0.6;
         MeshTextures[i] = NULL;
         if( d3dxMaterials[i].pTextureFilename != NULL && 
             lstrlen(d3dxMaterials[i].pTextureFilename) > 0 )
@@ -161,6 +164,8 @@ HRESULT InitGeometry()
                 }
             }
         }
+
+
     }
     
     D3DXMATERIAL*  roomMaterials= (D3DXMATERIAL*)roomBuffer->GetBufferPointer();
@@ -174,7 +179,11 @@ HRESULT InitGeometry()
 
         // Set the ambient color for the material (D3DX does not do this)
         RoomMeshMaterials[i].Ambient = RoomMeshMaterials[i].Diffuse;
-
+         
+       // RoomMeshMaterials[i].Emissive.r -= 0.1;
+       // RoomMeshMaterials[i].Emissive.g -= 0.1;
+       // RoomMeshMaterials[i].Emissive.b -= 0.1;
+        
         RoomMeshTextures[i] = NULL;
         if (roomMaterials[i].pTextureFilename != NULL &&
             lstrlen(roomMaterials[i].pTextureFilename) > 0)
@@ -425,12 +434,12 @@ INT WINAPI WinMain( HINSTANCE hInst, HINSTANCE, LPSTR, INT )
     // Register the window class
     WNDCLASSEX wc = { sizeof(WNDCLASSEX), CS_CLASSDC, MsgProc, 0L, 0L, 
                       GetModuleHandle(NULL), NULL, NULL, NULL, NULL,
-                      "D3D Tutorial", NULL };
+                      "D3D", NULL };
     RegisterClassEx( &wc );
 
     // Create the application's window
-    HWND hWnd = CreateWindow( "D3D Tutorial", "D3D Tutorial 06: Meshes", 
-                              WS_OVERLAPPEDWINDOW, 100, 100, 1000, 1000,
+    HWND hWnd = CreateWindow( "D3D", "D3D", 
+                              WS_OVERLAPPEDWINDOW, 460, 40, 1000, 1000,
                               GetDesktopWindow(), NULL, wc.hInstance, NULL );
 
     // Initialize Direct3D
@@ -459,7 +468,7 @@ INT WINAPI WinMain( HINSTANCE hInst, HINSTANCE, LPSTR, INT )
         }
     }
 
-    UnregisterClass( "D3D Tutorial", wc.hInstance );
+    UnregisterClass( "D3D", wc.hInstance );
     return 0;
 }
 
