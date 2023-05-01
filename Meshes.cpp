@@ -421,9 +421,8 @@ VOID Render()
         D3DXMATRIXA16 matWorld;
         D3DXMatrixIdentity(&matWorld);
         D3DXMatrixTranslation(&matWorld, pos.x, pos.y, pos.z);
-        d3dDevice->SetTransform(D3DTS_WORLD, &matWorld);
-
-        D3DXMatrixIdentity(&matWorld);
+        //d3dDevice->SetTransform(D3DTS_WORLD, &matWorld);
+        //D3DXMatrixIdentity(&matWorld);
         FLOAT theta_x = XMConvertToRadians(rot.x);
         FLOAT theta_y = XMConvertToRadians(rot.y);
         FLOAT theta_z = XMConvertToRadians(rot.z);
@@ -438,7 +437,7 @@ VOID Render()
         D3DXMatrixRotationY(&g_Transform_Rotate_y, theta_y);
         D3DXMatrixRotationZ(&g_Transform_Rotate_z, theta_z);
 
-        matWorld = matWorld * g_Transform_Rotate_y * g_Transform_Rotate_z * g_Transform_Rotate_x;
+        matWorld = g_Transform_Rotate_y * g_Transform_Rotate_z * g_Transform_Rotate_x * matWorld;
         d3dDevice->SetTransform(D3DTS_WORLD, &matWorld);
         
 
