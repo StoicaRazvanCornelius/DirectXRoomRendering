@@ -13,9 +13,13 @@ LPDIRECT3D9             D3D           = NULL; // Used to create the D3DDevice
 LPDIRECT3DDEVICE9       d3dDevice     = NULL; // Our rendering device
 
 LPD3DXMESH              Mesh          = NULL; // Our mesh object in sysmem
+LPD3DXMESH              RoomMesh          = NULL; // Our mesh object in sysmem
 D3DMATERIAL9*           MeshMaterials = NULL; // Materials for our mesh
+D3DMATERIAL9*           RoomMeshMaterials = NULL; // Materials for our mesh
 LPDIRECT3DTEXTURE9*     MeshTextures  = NULL; // Textures for our mesh
+LPDIRECT3DTEXTURE9*     RoomMeshTextures  = NULL; // Textures for our mesh
 DWORD                   NumMaterials = 0L;   // Number of mesh materials
+DWORD                   NumRoomMaterials = 0L;   // Number of mesh materials
 CXCamera *camera; 
 
 
@@ -69,7 +73,7 @@ void InitiateCamera()
 	// a point to lookat, and a direction for which way is up. Here, we set the
 	// eye five units back along the z-axis and up three units, look at the 
 	// origin, and define "up" to be in the y-direction.
-	D3DXVECTOR3 vEyePt(1.5f, 1.0f, -2.0f);
+	D3DXVECTOR3 vEyePt(0.0f, 1.0f, -3.0f);
 	D3DXVECTOR3 vLookatPt(0.0f, 0.5f, 0.0f);
 	D3DXVECTOR3 vUpVec(0.0f, 1.0f, 0.0f);
 	D3DXMATRIXA16 matView;
@@ -83,7 +87,7 @@ void InitiateCamera()
 //-----------------------------------------------------------------------------
 HRESULT InitGeometry()
 {
-    LPD3DXBUFFER pD3DXMtrlBuffer;
+    LPD3DXBUFFER pD3DXMtrlBuffer,roomBuffer;
 
     // Load the mesh from the specified file
     if( FAILED( D3DXLoadMeshFromX( "manequin.x", D3DXMESH_SYSTEMMEM, 
@@ -102,7 +106,24 @@ HRESULT InitGeometry()
         }
     }
 
-    // We need to extract the material properties and texture names from the 
+    // Load the mesh from the specified file
+    if (FAILED(D3DXLoadMeshFromX("room.x", D3DXMESH_SYSTEMMEM,
+        d3dDevice, NULL,
+        &roomBuffer, NULL, &NumRoomMaterials,
+        &RoomMesh)))
+    {
+        // If model is not in current folder, try parent folder
+        if (FAILED(D3DXLoadMeshFromX("..\\room.x", D3DXMESH_SYSTEMMEM,
+            d3dDevice, NULL,
+            &roomBuffer, NULL, &NumRoomMaterials,
+            &RoomMesh)))
+        {
+            MessageBox(NULL, "Could not find room.x", "Meshes.exe", MB_OK);
+            return E_FAIL;
+        }
+    }
+    
+// We need to extract the material properties and texture names from the 
     // pD3DXMtrlBuffer
     D3DXMATERIAL* d3dxMaterials = (D3DXMATERIAL*)pD3DXMtrlBuffer->GetBufferPointer();
     MeshMaterials = new D3DMATERIAL9[NumMaterials];
@@ -141,27 +162,76 @@ HRESULT InitGeometry()
             }
         }
     }
+    
+    D3DXMATERIAL*  roomMaterials= (D3DXMATERIAL*)roomBuffer->GetBufferPointer();
+    RoomMeshMaterials = new D3DMATERIAL9[NumRoomMaterials];
+    RoomMeshTextures = new LPDIRECT3DTEXTURE9[NumRoomMaterials];
+
+    for (DWORD i = 0; i < NumRoomMaterials; i++)
+    {
+        // Copy the material
+        RoomMeshMaterials[i] = roomMaterials[i].MatD3D;
+
+        // Set the ambient color for the material (D3DX does not do this)
+        RoomMeshMaterials[i].Ambient = RoomMeshMaterials[i].Diffuse;
+
+        RoomMeshTextures[i] = NULL;
+        if (roomMaterials[i].pTextureFilename != NULL &&
+            lstrlen(roomMaterials[i].pTextureFilename) > 0)
+        {
+            // Create the texture
+            if (FAILED(D3DXCreateTextureFromFile(d3dDevice,
+                roomMaterials[i].pTextureFilename,
+                &RoomMeshTextures[i])))
+            {
+                // If texture is not in current folder, try parent folder
+                const TCHAR* strPrefix = TEXT("..\\");
+                const int lenPrefix = lstrlen(strPrefix);
+                TCHAR strTexture[MAX_PATH];
+                lstrcpyn(strTexture, strPrefix, MAX_PATH);
+                lstrcpyn(strTexture + lenPrefix, roomMaterials[i].pTextureFilename, MAX_PATH - lenPrefix);
+                // If texture is not in current folder, try parent folder
+                if (FAILED(D3DXCreateTextureFromFile(d3dDevice,
+                    strTexture,
+                    &RoomMeshTextures[i])))
+                {
+                    MessageBox(NULL, "Could not find texture map", "Meshes.exe", MB_OK);
+                }
+            }
+        }
+    }
 
     // Done with the material buffer
     pD3DXMtrlBuffer->Release();
-
+    roomBuffer->Release();
 	//Declare object of type VertexBuffer
 	LPDIRECT3DVERTEXBUFFER9 VertexBuffer = NULL;
+	LPDIRECT3DVERTEXBUFFER9 RoomVertexBuffer = NULL;
+
 	//The pointer to the current element in the array in VertexBuffer
 	BYTE* Vertices = NULL;
+	BYTE* RoomVertices = NULL;
+
 	//Get the size of one element in the array of VertexBuffer 
 	DWORD FVFVertexSize = D3DXGetFVFVertexSize(Mesh->GetFVF());
-	//Get the VertexBuffer
-	Mesh->GetVertexBuffer(&VertexBuffer);
-	//Get the address of the first element in the array of VertexBuffer
-	VertexBuffer->Lock(0,0, (VOID**) &Vertices, D3DLOCK_DISCARD);
+	DWORD RoomFVFVertexSize = D3DXGetFVFVertexSize(RoomMesh->GetFVF());
 	
+    //Get the VertexBuffer
+	Mesh->GetVertexBuffer(&VertexBuffer);
+    RoomMesh->GetVertexBuffer(&RoomVertexBuffer);
+
+    //Get the address of the first element in the array of VertexBuffer
+	VertexBuffer->Lock(0,0, (VOID**) &Vertices, D3DLOCK_DISCARD);
+	RoomVertexBuffer->Lock(0, 0, (VOID**)&RoomVertices, D3DLOCK_DISCARD);
 	/*
 		Avem access
 	*/
 	
 	VertexBuffer->Unlock();
+    RoomVertexBuffer->Unlock();
+
 	VertexBuffer->Release();
+    RoomVertexBuffer->Release();
 
 	InitiateCamera();
 
@@ -180,6 +250,10 @@ VOID Cleanup()
     if( MeshMaterials != NULL ) 
         delete[] MeshMaterials;
 
+    if (RoomMeshMaterials != NULL)
+        delete[] RoomMeshMaterials;
+
+
     if( MeshTextures )
     {
         for( DWORD i = 0; i < NumMaterials; i++ )
@@ -189,8 +263,21 @@ VOID Cleanup()
         }
         delete[] MeshTextures;
     }
+    if (RoomMeshTextures)
+    {
+        for (DWORD i = 0; i < NumRoomMaterials; i++)
+        {
+            if (RoomMeshTextures[i])
+                RoomMeshTextures[i]->Release();
+        }
+        delete[] RoomMeshTextures;
+    }
+
+
     if( Mesh != NULL )
         Mesh->Release();
+    if( RoomMesh != NULL )
+        RoomMesh->Release();
     
     if( d3dDevice != NULL )
         d3dDevice->Release();
@@ -264,7 +351,7 @@ VOID Render()
 {
     // Clear the backbuffer and the zbuffer
     d3dDevice->Clear( 0, NULL, D3DCLEAR_TARGET|D3DCLEAR_ZBUFFER, 
-                         D3DCOLOR_XRGB(0,0,255), 1.0f, 0 );
+                         D3DCOLOR_XRGB(255,255,255), 1.0f, 0 );
     
     // Begin the scene
     if( SUCCEEDED( d3dDevice->BeginScene() ) )
@@ -284,6 +371,22 @@ VOID Render()
             Mesh->DrawSubset( i );
         }
 
+
+        //Shift world to render the room properly
+        D3DXMATRIXA16 matWorld;
+        D3DXMatrixIdentity(&matWorld);
+        D3DXMatrixTranslation(&matWorld, -1, -0.75f, -1.5);
+        d3dDevice->SetTransform(D3DTS_WORLD, &matWorld);
+
+        for (DWORD i = 0; i < NumRoomMaterials; i++)
+        {
+            // Set the material and texture for this subset
+            d3dDevice->SetMaterial(&RoomMeshMaterials[i]);
+            d3dDevice->SetTexture(0, RoomMeshTextures[i]);
+
+            // Draw the mesh subset
+            RoomMesh->DrawSubset(i);
+        }
         // End the scene
         d3dDevice->EndScene();
     }
