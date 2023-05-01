@@ -3,7 +3,8 @@
 #include <mmsystem.h>
 #include <d3dx9.h>
 #include <dinput.h>
-#include <dshow.h>   
+#include <dshow.h> 
+#include "directxmath.h"  
 #include "Camera.h"
 
 #pragma comment (lib, "d3d9.lib")
@@ -22,6 +23,13 @@ struct meshPosStruct {
     float y;
     float z;
 };
+struct meshRotStruct {
+    float x;
+    float y;
+    float z;
+};
+
+using namespace DirectX;
 //-----------------------------------------------------------------------------
 // Global variables
 //-----------------------------------------------------------------------------
@@ -30,6 +38,7 @@ LPDIRECT3DDEVICE9       d3dDevice     = NULL; // Our rendering device
 
 LPD3DXMESH              Mesh          = NULL; // Our mesh object in sysmem
 meshPosStruct           pos           = { 0,-0.05f,0 };
+meshPosStruct           rot           = { 0,0,0 };
 LPD3DXMESH              RoomMesh          = NULL; // Our mesh object in sysmem
 D3DMATERIAL9*           MeshMaterials = NULL; // Materials for our mesh
 D3DMATERIAL9*           RoomMeshMaterials = NULL; // Materials for our mesh
@@ -414,6 +423,24 @@ VOID Render()
         D3DXMatrixTranslation(&matWorld, pos.x, pos.y, pos.z);
         d3dDevice->SetTransform(D3DTS_WORLD, &matWorld);
 
+        D3DXMatrixIdentity(&matWorld);
+        FLOAT theta_x = XMConvertToRadians(rot.x);
+        FLOAT theta_y = XMConvertToRadians(rot.y);
+        FLOAT theta_z = XMConvertToRadians(rot.z);
+        D3DXMATRIX g_Transform_Rotate_x;
+        D3DXMATRIX g_Transform_Rotate_y;
+        D3DXMATRIX g_Transform_Rotate_z;
+        D3DXMatrixIdentity(&g_Transform_Rotate_x);
+        D3DXMatrixIdentity(&g_Transform_Rotate_y);
+        D3DXMatrixIdentity(&g_Transform_Rotate_z);
+
+        D3DXMatrixRotationX(&g_Transform_Rotate_x, theta_x);
+        D3DXMatrixRotationY(&g_Transform_Rotate_y, theta_y);
+        D3DXMatrixRotationZ(&g_Transform_Rotate_z, theta_z);
+
+        matWorld = matWorld * g_Transform_Rotate_y * g_Transform_Rotate_z * g_Transform_Rotate_x;
+        d3dDevice->SetTransform(D3DTS_WORLD, &matWorld);
+        
 
         for (DWORD i = 0; i < NumMaterials; i++)
         {
@@ -430,7 +457,7 @@ VOID Render()
         D3DXMatrixIdentity(&matWorld);
         D3DXMatrixTranslation(&matWorld, -1, -0.75f, -1.5);
         d3dDevice->SetTransform(D3DTS_WORLD, &matWorld);
-
+        
         for (DWORD i = 0; i < NumRoomMaterials; i++)
         {
             // Set the material and texture for this subset
@@ -681,6 +708,42 @@ INT WINAPI WinMain( HINSTANCE hInst, HINSTANCE, LPSTR, INT )
                         if (FAILED(InitDirectShow(hWnd)))
                             return 0;
                         pos.x -= 0.1f;
+                        Render();
+                    }
+                    if (g_Keystate[DIK_Q] & 0x80) {
+                        if (FAILED(InitDirectShow(hWnd)))
+                            return 0;
+                        pos.y += 0.1f;
+                        Render();
+                    }
+                    if (g_Keystate[DIK_E] & 0x80) {
+                        if (FAILED(InitDirectShow(hWnd)))
+                            return 0;
+                        pos.y -= 0.1f;
+                        Render();
+                    }
+                    if (g_Keystate[DIK_NUMPAD8] & 0x80) {
+                        rot.x += 10;
+                        Render();
+                    }
+                    if (g_Keystate[DIK_NUMPAD2] & 0x80) {
+                        rot.x -= 10;
+                        Render();
+                    }
+                    if (g_Keystate[DIK_NUMPAD6] & 0x80) {
+                        rot.y += 10;
+                        Render();
+                    }
+                    if (g_Keystate[DIK_NUMPAD4] & 0x80) {
+                        rot.y -= 10;
+                        Render();
+                    }
+                    if (g_Keystate[DIK_NUMPAD7] & 0x80) {
+                        rot.z -= 10;
+                        Render();
+                    }
+                    if (g_Keystate[DIK_NUMPAD9] & 0x80) {
+                        rot.z += 10;
                         Render();
                     }
                     #pragma endregion
