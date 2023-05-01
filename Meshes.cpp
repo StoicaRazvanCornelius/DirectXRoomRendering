@@ -3,12 +3,19 @@
 #include <mmsystem.h>
 #include <d3dx9.h>
 #include <dinput.h>
+#include <dshow.h>   
 #include "Camera.h"
 
 #pragma comment (lib, "d3d9.lib")
 #pragma comment (lib, "d3dx9.lib")
 #pragma comment (lib, "dinput8.lib")
 #pragma comment (lib, "dxguid.lib")
+
+//We define an event id 
+#define WM_GRAPHNOTIFY  WM_APP + 1   
+
+#define ONE_SECOND 10000000
+REFERENCE_TIME rtNow = 0 * ONE_SECOND;
 
 struct meshPosStruct {
     float x;
@@ -42,6 +49,17 @@ BYTE					g_Keystate[256];				// the storage for the key-information
 LPDIRECTINPUTDEVICE8	g_pDinmouse;					// the pointer to the mouse device
 DIMOUSESTATE			g_pMousestate;					// the storage for the mouse-information
 
+
+
+IGraphBuilder* graphBuilder = NULL;
+//Help us to start/stop the play
+IMediaControl* mediaControl = NULL;
+//We receie events in case something happened - during playing, stoping, errors etc..
+IMediaEventEx* mediaEvent = NULL;
+//We can use to fast forward, revert etc..
+IMediaSeeking* mediaSeeking = NULL;
+HWND hWnd;
+HDC hdc;
 
 
 #pragma region d3dStuff
@@ -432,20 +450,6 @@ VOID Render()
 #pragma endregion
 
 
-//-----------------------------------------------------------------------------
-LRESULT WINAPI MsgProc( HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam )
-{
-    switch( msg )
-    {
-        case WM_DESTROY:
-            Cleanup();
-            PostQuitMessage( 0 );
-            return 0;
-    }
-
-    return DefWindowProc( hWnd, msg, wParam, lParam );
-}
-
 
 #pragma region input
 HRESULT InitDInput(HINSTANCE hInstance, HWND hWnd)
@@ -496,6 +500,80 @@ VOID DetectInput()
 
 #pragma endregion
 
+
+#pragma region directshow
+HRESULT InitDirectShow(HWND hWnd)
+{
+    //Create Filter Graph   
+    HRESULT hr = CoCreateInstance(CLSID_FilterGraph, NULL,
+        CLSCTX_INPROC_SERVER, IID_IGraphBuilder, (void**)&graphBuilder);
+
+    //Create Media Control and Events   
+    hr = graphBuilder->QueryInterface(IID_IMediaControl, (void**)&mediaControl);
+    hr = graphBuilder->QueryInterface(IID_IMediaEventEx, (void**)&mediaEvent);
+    hr = graphBuilder->QueryInterface(IID_IMediaSeeking, (void**)&mediaSeeking);
+
+    //Load a file   
+    hr = graphBuilder->RenderFile(L"drag.wav", NULL);
+
+    //Set window for events  - basically we tell our event in case you raise an event use the following event id.
+    mediaEvent->SetNotifyWindow((OAHWND)hWnd, WM_GRAPHNOTIFY, 0);
+
+    //Rewind+Play media control   
+    REFERENCE_TIME stop;
+    mediaSeeking->GetDuration(&stop);
+    mediaSeeking->SetPositions(0, AM_SEEKING_AbsolutePositioning, &stop, AM_SEEKING_AbsolutePositioning);
+    mediaControl->Run();
+
+
+    return S_OK;
+}
+
+void HandleGraphEvent()
+{
+    // Get all the events   
+    long evCode;
+    LONG_PTR param1, param2;
+
+    while (SUCCEEDED(mediaEvent->GetEvent(&evCode, &param1, &param2, 0)))
+    {
+        mediaEvent->FreeEventParams(evCode, param1, param2);
+        switch (evCode)
+        {
+        case EC_COMPLETE:  // Fall through.   
+        case EC_USERABORT: // Fall through.   
+        case EC_ERRORABORT:
+
+            PostQuitMessage(0);
+            return;
+        }
+    }
+}
+
+LRESULT WINAPI MsgProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
+{
+    switch (msg)
+    {
+    case WM_DESTROY:
+        Cleanup();
+        PostQuitMessage(0);
+        return 0;
+
+        case WM_GRAPHNOTIFY:
+        //Rewind+Play media control   
+        REFERENCE_TIME stop;
+        mediaSeeking->GetDuration(&stop);
+        mediaSeeking->SetPositions(0, AM_SEEKING_AbsolutePositioning, &stop, AM_SEEKING_AbsolutePositioning);
+        mediaControl->Run();
+        return 0;
+        HandleGraphEvent();
+    }
+
+    return DefWindowProc(hWnd, msg, wParam, lParam);
+}
+
+
+#pragma endregion
 //-----------------------------------------------------------------------------
 // Name: WinMain()
 // Desc: The application's entry point
@@ -513,10 +591,14 @@ INT WINAPI WinMain( HINSTANCE hInst, HINSTANCE, LPSTR, INT )
                               WS_OVERLAPPEDWINDOW, 460, 40, 1000, 1000,
                               GetDesktopWindow(), NULL, wc.hInstance, NULL );
 
+    HRESULT hr = CoInitialize(NULL);
+
+    hdc = GetDC(hWnd);
+
     // Initialize Direct3D
     if( SUCCEEDED( InitD3D( hWnd ) ) )
     { 
-        // Create the scene geometry
+       // Create the scene geometry
         if( SUCCEEDED( InitGeometry() ) )
         {
             InitDInput(hInst, hWnd);
@@ -528,6 +610,7 @@ INT WINAPI WinMain( HINSTANCE hInst, HINSTANCE, LPSTR, INT )
             // Enter the message loop
             MSG msg; 
             ZeroMemory( &msg, sizeof(msg) );
+
             while( msg.message!=WM_QUIT )
             {
                 if( PeekMessage( &msg, NULL, 0U, 0U, PM_REMOVE ) )
@@ -577,18 +660,26 @@ INT WINAPI WinMain( HINSTANCE hInst, HINSTANCE, LPSTR, INT )
 
                     #pragma region meshInput
                     if (g_Keystate[DIK_W] & 0x80) {
+                        if (FAILED(InitDirectShow(hWnd)))
+                            return 0;
                         pos.z += 0.1f;
                         Render();
                     }
                     if (g_Keystate[DIK_S] & 0x80) {
+                        if (FAILED(InitDirectShow(hWnd)))
+                            return 0;
                         pos.z -= 0.1f;
                         Render();
                     }
                     if (g_Keystate[DIK_D] & 0x80) {
+                        if (FAILED(InitDirectShow(hWnd)))
+                            return 0;
                         pos.x += 0.1f;
                         Render();
                     }
                     if (g_Keystate[DIK_A] & 0x80) {
+                        if (FAILED(InitDirectShow(hWnd)))
+                            return 0;
                         pos.x -= 0.1f;
                         Render();
                     }
@@ -602,6 +693,8 @@ INT WINAPI WinMain( HINSTANCE hInst, HINSTANCE, LPSTR, INT )
             }
         }
     }
+
+    CoUninitialize();
 
     UnregisterClass( "D3D", wc.hInstance );
     return 0;
