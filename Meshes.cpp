@@ -10,6 +10,11 @@
 #pragma comment (lib, "dinput8.lib")
 #pragma comment (lib, "dxguid.lib")
 
+struct meshPosStruct {
+    float x;
+    float y;
+    float z;
+};
 //-----------------------------------------------------------------------------
 // Global variables
 //-----------------------------------------------------------------------------
@@ -17,6 +22,7 @@ LPDIRECT3D9             D3D           = NULL; // Used to create the D3DDevice
 LPDIRECT3DDEVICE9       d3dDevice     = NULL; // Our rendering device
 
 LPD3DXMESH              Mesh          = NULL; // Our mesh object in sysmem
+meshPosStruct           pos           = { 0,-0.05f,0 };
 LPD3DXMESH              RoomMesh          = NULL; // Our mesh object in sysmem
 D3DMATERIAL9*           MeshMaterials = NULL; // Materials for our mesh
 D3DMATERIAL9*           RoomMeshMaterials = NULL; // Materials for our mesh
@@ -35,6 +41,7 @@ BYTE					g_Keystate[256];				// the storage for the key-information
 
 LPDIRECTINPUTDEVICE8	g_pDinmouse;					// the pointer to the mouse device
 DIMOUSESTATE			g_pMousestate;					// the storage for the mouse-information
+
 
 
 #pragma region d3dStuff
@@ -386,7 +393,7 @@ VOID Render()
 
         D3DXMATRIXA16 matWorld;
         D3DXMatrixIdentity(&matWorld);
-        D3DXMatrixTranslation(&matWorld, 0, 0.5f, 0);
+        D3DXMatrixTranslation(&matWorld, pos.x, pos.y, pos.z);
         d3dDevice->SetTransform(D3DTS_WORLD, &matWorld);
 
 
@@ -564,28 +571,25 @@ INT WINAPI WinMain( HINSTANCE hInst, HINSTANCE, LPSTR, INT )
                     }
                     #pragma endregion
 
-                  
-
                     if (g_Keystate[DIK_ESCAPE] & 0x80) {
                         PostMessage(hWnd, WM_DESTROY, 0, 0);
                     }
 
                     #pragma region meshInput
                     if (g_Keystate[DIK_W] & 0x80) {
-                      
-                        camera->MoveForward(0.1f);
+                        pos.z += 0.1f;
                         Render();
                     }
                     if (g_Keystate[DIK_S] & 0x80) {
-                        camera->MoveForward(-0.1f);
+                        pos.z -= 0.1f;
                         Render();
                     }
                     if (g_Keystate[DIK_D] & 0x80) {
-                        camera->MoveRight(0.1f);
+                        pos.x += 0.1f;
                         Render();
                     }
                     if (g_Keystate[DIK_A] & 0x80) {
-                        camera->MoveRight(-0.1f);
+                        pos.x -= 0.1f;
                         Render();
                     }
                     #pragma endregion
